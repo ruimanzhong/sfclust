@@ -71,13 +71,13 @@ The function `initial.cluster ` is to build a initial partition parameters (Grap
 # Initialize the graph data using Minimum Spanning Tree (MST)
 geodata <- initial_cluster (map, method = 'adjmat', nclust = 10)
 coords <- st_coordinates(st_centroid(map))
-plotGraph(map,coords,geodata$graph,"Initial graph")
+plot(geodata$graph, layout = coords)
 ```
 
 We could also check the initial MST and cluster memberships, by
 
 ```{r fig.width=6, fig.height=4}
-plotMST(map,coords,geodata$mst,geodata$cluster, " ", height = 4)
+plot(geodata$mst, layout = coords)
 ```
 
 
@@ -161,9 +161,9 @@ plot(mlik, type = "l", main = "Marginal Likelihoods After Continued MCMC Run",
 Print the final cluster_membership and plot.
 
 ```{r fig.width=6, fig.height=4}
-clust_res = result_continue$cluster[length(result_continue$mst),]
+clust_res <- result_continue$cluster[length(result_continue$mst),]
 clust_res
-plotClusterMap(clust_res, NULL, map, NULL,title = " ",fill = "Cluster", filepath = NULL)
+plot(result_continue, map)
 ```
 
 ### Check the fitted curves and time series of each cluster

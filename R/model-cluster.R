@@ -31,8 +31,8 @@
 #' bsfc(data, family, formula, graph, init_val, hyperpar, MCMC, burnin, THIN, path_save)
 #' }
 #' @export
-bsfc <- function(Y, graphdata = list(graph = NULL, mst = NULL, cluster = NULL), X = NULL, N = NULL,
-                 formula = Yk ~ 1 + Xk, family = "normal",q = 0.5,
+sfclust <- function(Y, graphdata = list(graph = NULL, mst = NULL, cluster = NULL), X = NULL, N = NULL,
+                 formula = Y ~ 1 + X, family = "normal",q = 0.5,
                  correction = NULL, niter = 100, burnin = 0, thin = 1, path_save = NULL, nsave = 10,  ...) {
   ## Setup
   # apply correction if rw effect is used
@@ -54,15 +54,6 @@ bsfc <- function(Y, graphdata = list(graph = NULL, mst = NULL, cluster = NULL), 
   birth_cnt <- 0
   death_cnt <- 0
   change_cnt <- 0
-  
-  formula_str <- as.character(formula)
-  
-  # Replace Y and X with Yk and Xk
-  formula_str <- gsub("Y", paste0("Y", k), formula_str)
-  formula_str <- gsub("X", paste0("X", k), formula_str)
-  
-  # Convert the string back to a formula
-  new_formula <- as.formula(formula_str)
 
   ## Initialize
 
@@ -263,8 +254,9 @@ bsfc <- function(Y, graphdata = list(graph = NULL, mst = NULL, cluster = NULL), 
 
   p <- max(cluster)
   sorted_cluster <- as.numeric(names(sort(table(cluster), decreasing = TRUE)))
-  
+
   final_model <- lapply(1:p, log_mlik_each, Y, sorted_cluster, X, N, formula, family, correction = F, detailed = T, ...)
+  class(final_model) <- "sfclustm"
   # Final result
   output <- list(
     cluster = cluster_out, log_mlike = log_mlike_out, mst = mst_out,
