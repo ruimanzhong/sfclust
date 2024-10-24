@@ -5,35 +5,30 @@
 \title{Calculate Log Marginal Likelihood for All Clusters}
 \usage{
 log_mlik_all(
-  Y,
+  stars_obj,
   membership,
-  X = NULL,
-  N = NULL,
-  formula = Yk ~ 1 + Xk,
+  formula,
   family = "normal",
   correction = FALSE,
+  time_var,
+  N_var,
   ...
 )
 }
 \arguments{
-\item{Y}{Numeric matrix or data frame of observations, where rows typically represent observational units
-and columns represent different variables.}
+\item{stars_obj}{A stars object containing spatial data, including covariates and response variables.}
 
 \item{membership}{Integer vector indicating the cluster membership for each observation.}
 
-\item{X}{Optional numeric matrix or data frame of covariates used in the model (if applicable).}
+\item{formula}{An object of class \code{\link[stats]{formula}} specifying the model to be used in INLA.}
 
-\item{N}{Optional numeric vector indicating the number of trials or cases, relevant for
-distributions like binomial (default is NULL).}
+\item{family}{Character string specifying the family of distributions to use for the model. Defaults to "normal".}
 
-\item{formula}{An object of class \code{\link[stats]{formula}} specifying the model to be used in INLA.
-Default is \code{Yk ~ 1 + Xk}, which can be adjusted based on the model requirements.}
+\item{correction}{Logical indicating whether a correction for dispersion or other factors should be applied. Defaults to FALSE.}
 
-\item{family}{Character string specifying the family of distributions to use for the model.
-Defaults to "normal". Other possible values include "binomial", "poisson", etc.}
+\item{time_var}{The name of the time variable in the stars object.}
 
-\item{correction}{Logical indicating whether a correction for dispersion or other factors
-should be applied. Defaults to FALSE.}
+\item{N_var}{The name of the variable used as exposure or trials (for Poisson, binomial, etc.).}
 
 \item{...}{Additional arguments passed to the underlying \code{log_mlik_each} function.}
 }
@@ -44,17 +39,8 @@ A numeric vector containing the log marginal likelihood for each cluster.
 This function computes the log marginal likelihood for each cluster specified in the membership vector.
 It applies a specified model to each cluster to calculate the likelihood.
 }
-\details{
-This function iterates over the unique clusters defined in the \code{membership} vector and
-calculates the log marginal likelihood for each cluster using the \code{log_mlik_each} function.
-The function is flexible and allows for different families of distributions and model specifications
-by adjusting the formula, family, and other parameters.
-}
 \examples{
 \dontrun{
-# Assume Y is a matrix of observations, membership defines cluster memberships
-# and X is a matrix of covariates:
-log_mlikelihoods <- log_mlik_all(Y, membership, X = X, family = "poisson")
+log_mlikelihoods <- log_mlik_all(stars_obj, membership, family = "poisson", formula = Y ~ temperature + precipitation, time_var = "time", N_var = "expected_cases")
 }
-
 }

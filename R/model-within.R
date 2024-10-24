@@ -1,161 +1,142 @@
+
 #' Evaluate Log Marginal Likelihood for Each Cluster Using INLA
 #'
-#' This function computes the log marginal likelihood for a specific cluster `k` within a dataset. It supports multiple family distributions and allows for the inclusion of exposure or trial sizes if applicable. The function is flexible, accepting custom formulas and additional arguments for the INLA model fitting.
+#' This function computes the log marginal likelihood for a specific cluster `k` within a dataset.
+#' It supports multiple family distributions and allows for the inclusion of exposure or trial sizes if applicable.
+#' The function is flexible, accepting custom formulas and additional arguments for the INLA model fitting.
 #'
 #' @param k Integer, the cluster index for which to compute the log marginal likelihood.
-#' @param Y Numeric vector or matrix, representing the response variable(s) in the model.
+#' @param stars_obj A stars object containing spatial data, including covariates and response variables.
 #' @param membership Integer vector, indicating the cluster membership of each observation.
-#' @param X Numeric matrix or NULL, optional covariates for the model; defaults to NULL if not provided.
-#' @param N Numeric vector or NULL, representing the number of trials or exposures for each observation (necessary for binomial and Poisson models); defaults to NULL.
-#' @param family Character string specifying the family of the model, with support for "normal", "poisson", "binomial", and "nbinomial" (negative binomial variant 1); defaults to "normal".
-#' @param formula Object of class \code{\link[stats]{formula}}, specifying the model to be fitted; defaults to `Yk ~ 1 + Xk`.
-#' @param correction Logical, indicating whether a correction should be applied to the computed log marginal likelihood; defaults to FALSE.
-#' @param detailed Logical, specifying whether to return the full model object or just the log marginal likelihood; defaults to FALSE.
+#' @param formula Object of class \code{\link[stats]{formula}}, specifying the model to be fitted.
+#' @param family Character string specifying the family of the model, with support for "normal", "poisson",
+#' "binomial", and "nbinomial" (negative binomial variant 1); defaults to "normal".
+#' @param correction Logical, indicating whether a correction should be applied to the computed log marginal
+#' likelihood; defaults to FALSE.
+#' @param time_var The name of the time variable in the stars object.
+#' @param N_var The name of the variable used as exposure or trials (for Poisson, binomial, etc.).
+#' @param detailed Logical, specifying whether to return the full model object or just the log marginal
+#' likelihood; defaults to FALSE.
 #' @param ... Additional arguments passed to the INLA function.
 #'
 #' @return Depending on the `detailed` parameter:
 #'   - If `detailed` is TRUE, returns the full `INLA` model object.
 #'   - If `detailed` is FALSE, returns the log marginal likelihood (corrected if `correction` is TRUE).
 #'
-#'
 #' @examples
 #' \dontrun{
-#' # Define data matrices and parameters
-#' Y <- matrix(rpois(100, lambda = 10), ncol = 10)
-#' population <- matrix(rpois(100, lambda = 5), ncol = 10)
-#' inla.extra <- list(family = "poisson", N = population)
+#' stars_obj <- create_stars_object(...)
 #' membership <- sample(1:2, 10, replace = TRUE)
-#' X <- seq(0, 1, length.out = 10)
-#' a0 <- 0.1
-#' b0 <- 0.1
-#'
-#' # Define a formula, the name of the iid random effec should be idx
-#' formula <- Yk ~ 1 + Xk + f(
-#'   idx,
-#'   model <- "iid",
-#'   hyper <- list(prec = list(prior = "loggamma", param = c(a0, b0)))
-#' )
-#' formula <- Yk ~ 1 + Xk + f(idx, model = "iid", hyper = list(prec = list(prior = "loggamma", param = c(a0, b0))))
-#' formula <- Yk~ 1 + f(Xk, model = "rw1", scale.model = TRUE, hyper = list(theta = list(prior = "pc.prec", param = c(1, 0.01)))) +
-#'   f(idx, model = "iid", hyper = list(prec = list(prior = "loggamma", param = c(a0, b0))))
-#' formula <- Yk ~ 1 + f(ids, model = "iid", group = idt, control.group = list(model = "ar1"), hyper = list(prec = list(prior = "loggamma", param = c(a0, b0))))
-#' # Call the function
-#' result <- log_mlik_each(1, Y, X, inla.extra, membership, custom_formula, TRUE)
+#' formula <- Y ~ temperature + precipitation + f(ids, model = "iid")
+#' result <- log_mlik_each(1, stars_obj, membership, formula = formula, family = "poisson", correction = TRUE)
 #' }
 #' @export
-log_mlik_each <- function(k, Y, membership, X = NULL, N = NULL, formula = Yk ~ 1 + Xk,
-                          family = "normal", correction = FALSE, detailed = FALSE, ...) {
-  inla_data <- prepare_data_each(k, Y, membership, X, N)
+log_mlik_each <- function(k, stars_obj, membership, formula, family = "normal", correction = FALSE, time_var, N_var, detailed = FALSE, ...) {
+  inla_data <- preprocess_data_each(stars_obj, k, membership, time_var = time_var)
+  if(!is.null(N_var)){N <- get(N_var, envir = as.environment(stars_obj))}
   if (family == "poisson") {
     model <- INLA::inla(formula, family,
-      E = Nk,
-      data = inla_data, control.predictor = list(compute = TRUE),
-      control.compute = list(config = TRUE), ...
+                        E = N,  # Use N from the stars object, if present
+                        data = inla_data, control.predictor = list(compute = TRUE),
+                        control.compute = list(config = TRUE), ...
     )
   } else if (family == "binomial") {
     model <- INLA::inla(formula, family,
-      Ntrials = Nk,
-      data = inla_data, control.predictor = list(compute = TRUE),
-      control.compute = list(config = TRUE), ...
+                        Ntrials = N,  # Use N from the stars object, if present
+                        data = inla_data, control.predictor = list(compute = TRUE),
+                        control.compute = list(config = TRUE), ...
     )
   } else if (family == "nbinomial") {
     model <- INLA::inla(formula, family,
-      control.family = list(variant = 1), Ntrials = Nk,
-      data = inla_data, control.predictor = list(compute = TRUE),
-      control.compute = list(config = TRUE), ...
+                        control.family = list(variant = 1), Ntrials = N,  # Use N from stars_obj
+                        data = inla_data, control.predictor = list(compute = TRUE),
+                        control.compute = list(config = TRUE), ...
     )
   } else if (family == "normal" | is.null(family)) {
     model <- INLA::inla(formula, family,
-      data = inla_data, control.predictor = list(compute = TRUE),
-      control.compute = list(config = TRUE), ...
+                        data = inla_data, control.predictor = list(compute = TRUE),
+                        control.compute = list(config = TRUE), ...
     )
   }
 
   if (detailed) {
-    model
+    return(model)
   } else {
     if (correction) {
-      model[["mlik"]][[1]] + log_mlik_correction(model, formula)
+      return(model[["mlik"]][[1]] + log_mlik_correction(model, formula))
     } else {
-      model[["mlik"]][[1]]
+      return(model[["mlik"]][[1]])
     }
   }
 }
 
+#########################################################################################################
 #' Calculate Log Marginal Likelihood for All Clusters
 #'
 #' This function computes the log marginal likelihood for each cluster specified in the membership vector.
 #' It applies a specified model to each cluster to calculate the likelihood.
 #'
-#' @param Y Numeric matrix or data frame of observations, where rows typically represent observational units
-#'        and columns represent different variables.
+#' @param stars_obj A stars object containing spatial data, including covariates and response variables.
 #' @param membership Integer vector indicating the cluster membership for each observation.
-#' @param X Optional numeric matrix or data frame of covariates used in the model (if applicable).
-#' @param N Optional numeric vector indicating the number of trials or cases, relevant for
-#'        distributions like binomial (default is NULL).
 #' @param formula An object of class \code{\link[stats]{formula}} specifying the model to be used in INLA.
-#'        Default is `Yk ~ 1 + Xk`, which can be adjusted based on the model requirements.
-#' @param family Character string specifying the family of distributions to use for the model.
-#'        Defaults to "normal". Other possible values include "binomial", "poisson", etc.
-#' @param correction Logical indicating whether a correction for dispersion or other factors
-#'        should be applied. Defaults to FALSE.
+#' @param family Character string specifying the family of distributions to use for the model. Defaults to "normal".
+#' @param correction Logical indicating whether a correction for dispersion or other factors should be applied. Defaults to FALSE.
+#' @param time_var The name of the time variable in the stars object.
+#' @param N_var The name of the variable used as exposure or trials (for Poisson, binomial, etc.).
 #' @param ... Additional arguments passed to the underlying `log_mlik_each` function.
-#'
-#' @details This function iterates over the unique clusters defined in the `membership` vector and
-#'          calculates the log marginal likelihood for each cluster using the `log_mlik_each` function.
-#'          The function is flexible and allows for different families of distributions and model specifications
-#'          by adjusting the formula, family, and other parameters.
 #'
 #' @return A numeric vector containing the log marginal likelihood for each cluster.
 #'
 #' @examples
 #' \dontrun{
-#' # Assume Y is a matrix of observations, membership defines cluster memberships
-#' # and X is a matrix of covariates:
-#' log_mlikelihoods <- log_mlik_all(Y, membership, X = X, family = "poisson")
+#' log_mlikelihoods <- log_mlik_all(stars_obj, membership, family = "poisson", formula = Y ~ temperature + precipitation, time_var = "time", N_var = "expected_cases")
+#' }
+#' @export
+log_mlik_all <- function(stars_obj, membership, formula, family = "normal", correction = FALSE, time_var, N_var, ...) {
+  k <- max(membership)
+  sapply(1:k, log_mlik_each, stars_obj, membership, formula, family, correction, time_var, N_var, ...)
+}
+
+########################################################################################################################
+#' This function preprocesses the data from a stars object by subsetting based on a cluster
+#' and converting the data to a long format with proper indexing for time and spatial location.
+#'
+#' @param x A stars object containing spatial-temporal dimensions defined in `stnames`.
+#' @param k The cluster number to subset.
+#' @param membership A vector defining the cluster membership for each region.
+#' @param stnames The names of the `spatial` and `temporal` dimensions.
+#'
+#' @return A long-format data frame with ids for spatial and time indexing.
+#'
+#' @examples
+#' \dontrun{
+#' preprocess_data_each(x, k = 1, membership, time_var = "time")
 #' }
 #'
 #' @export
-log_mlik_all <- function(Y, membership, X = NULL, N = NULL, formula = Yk ~ 1 + Xk,
-                         family = "normal", correction = FALSE, ...) {
-  k <- max(membership)
-  sapply(1:k, log_mlik_each, Y, membership, X, N, formula, family, correction, FALSE, ...)
-}
-
-##############################################################
-
-## Auxiliary function to create data.frame for cluster `k`
-
-prepare_data_each <- function(k, Y, membership, X = NULL, N = NULL) {
-  ind <- which(membership == k)
-  nk <- length(ind)
-  nt <- nrow(Y)
-
-  # response
-  Yk <- as.vector(Y[, ind])
-
-  # size
-  if (is.vector(N)) {
-    Nk <- rep(N[ind], each = nt)
-  } else if (is.matrix(N)) {
-    Nk <- as.vector(N[, ind])
-  } else {
-    Nk <- NULL
+preprocess_data_each <- function(x, k, membership, stnames = c("geometry", "time")) {
+  # Check if the input is a stars object and dimension names
+  if (!inherits(x, "stars")) {
+    stop("Input must be a 'stars' object.")
+  }
+  if (any(!(stnames %in% dimnames(x)))) {
+    stop("Provided dimension names not found in starts object `x`.")
   }
 
-  # predictors
-  if (is.vector(X) | is.factor(X)) {
-    Xk <- rep(X, times = nk)
-  } else if (is.matrix(X)) {
-    Xk <- kronecker(rep(1, nk), X)
-  } else {
-    Xk <- NULL
-  }
+  # Subset cluster k
+  cluster <- which(membership == k)
+  x <- dplyr::filter(x, !!as.name(stnames[1]) %in% cluster)
 
-  list(
-    Yk = Yk, Nk = Nk, id = 1:(nk * nt), idt = rep(1:nt, nk), ids = rep(1:nk, each = nt),
-    Xk = Xk
-  )
+  # Spatio-temporal dimenstion in long format
+  dims <- expand_dimensions(x)
+  dims[[stnames[1]]] <- seq_along(dims[[stnames[1]]])
+  dims[[stnames[2]]] <- order(dims[[stnames[2]]])
+  dims <- setNames(do.call(expand.grid, dims)[stnames], c("ids", "idt"))
+
+  # Merge dimensions and dataframe
+  x <- as.data.frame(x)
+  x[[stnames[1]]] <- NULL
+  cbind(list(id = 1:nrow(dims)), dims, x)
 }
 
 ##############################################################

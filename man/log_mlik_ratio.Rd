@@ -8,24 +8,20 @@ log_mlik_ratio(
   move,
   log_mlike_vec,
   proposed_move,
-  Y,
-  X = NULL,
-  N = NULL,
-  formula = Yk ~ 1 + Xk,
+  stars_obj,
+  formula,
   family = "normal",
   correction = FALSE,
-  detailed = FALSE,
+  time_var,
+  N_var,
+  detailed = F,
   ...
 )
 }
 \arguments{
 \item{move}{A character string specifying the type of move; either "split" or "merge".}
 
-\item{Y}{Numeric matrix of data observations.}
-
-\item{X}{Numeric matrix representing the model's design matrix or covariates.}
-
-\item{N}{The number of trials or cases, applicable in certain statistical families like binomial.}
+\item{stars_obj}{A stars spatial temporal objects including responses, covariates, and other data.}
 
 \item{formula}{An object of class \code{\link[stats]{formula}} specifying the model to be used in INLA.}
 
@@ -33,14 +29,16 @@ log_mlik_ratio(
 
 \item{correction}{Logical, specifying whether correction calculations should be executed.}
 
+\item{time_var}{The name of the time variable in the stars object.}
+
+\item{N_var}{The name of the variable used as exposure or trials (for Poisson, binomial, etc.).}
+
 \item{detailed}{Logical, indicating whether detailed output from INLA is required.}
 
 \item{log_like_vec}{A numeric vector of existing log likelihoods for all clusters.}
 
 \item{control.move}{A list containing control parameters and information about the move,
 such as \code{clust_old}, \code{k}, \code{cluster_newid}, and \code{cluster_rm}.}
-
-\item{membership}{Integer vector indicating the cluster membership of each observation.}
 }
 \value{
 A list containing the updated log likelihood vector and the log likelihood ratio (\code{llratio}).
